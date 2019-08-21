@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# ignore Pipfile.lock
+Pipfile.lock
+
+# ignore .idea
+.idea/
