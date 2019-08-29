@@ -32,14 +32,18 @@ REST_NEW_ORDER = '/open/api/v2/new_order'
 REST_ORDER_INFO = '/open/api/order_info'
 REST_SYMBOLS = '/open/api/common/symbols'
 
+SYMBOL = 'trxusdt'
+
+WS_TICKER_CHANNEL = 'market_%s_trade_ticker'%(SYMBOL)
+WS_DEPTH_CHANNEL = 'market_%s_depth_step0'%(SYMBOL)
 # WS API
-WS_TRADE_TICKER_SUB = '{"event":"sub","params":{"channel":"market_symbol_trade_ticker","cb_id":"custom string"}}'
-WS_TRADE_TICKER_UNSUB = '{"event":"unsub","params":{"channel":"market_symbol_trade_ticker"}}'
+WS_TRADE_TICKER_SUB = '{"event":"sub","params":{"channel":"market_%s_trade_ticker","cb_id":"custom string"}}'%(SYMBOL)
+WS_TRADE_TICKER_UNSUB = '{"event":"unsub","params":{"channel":"market_%s_trade_ticker"}}'%(SYMBOL)
 
-WS_MARKET_DEPTH_SUB = '{"event":"sub","params":{"channel":"market_symbol_depth_steplevel","cb_id":"custom string","asks":150,"bids":150}}'
-WS_MARKET_DEPTH_UNSUB = '{"event":"unsub","params":{"channel":"market_symbol_depth_steplevel","cb_id":"custom string","asks":150,"bids":150}}'
+WS_MARKET_DEPTH_SUB = '{"event":"sub","params":{"channel":"market_%s_depth_step0","cb_id":"custom string","asks":150,"bids":150}}'%(SYMBOL)
+WS_MARKET_DEPTH_UNSUB = '{"event":"unsub","params":{"channel":"market_%s_depth_step0","cb_id":"custom string","asks":150,"bids":150}}'%(SYMBOL)
 
-WS_MARKET_KLINE_SUB = '{"event":"sub","params":{"channel":"market_symbol_kline_period","cb_id":"custom string"}}'
-WS_MARKET_KLINE_UNSUB = '{"event":"unsub","params":{"channel":"market_symbol_kline_period"}}'
+WS_MARKET_KLINE_SUB = '{"event":"sub","params":{"channel":"market_%s_kline_period","cb_id":"custom string"}}'%(SYMBOL)
+WS_MARKET_KLINE_UNSUB = '{"event":"unsub","params":{"channel":"market_%s_kline_period"}}'%(SYMBOL)
 
 
