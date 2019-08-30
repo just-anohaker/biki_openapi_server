@@ -133,6 +133,9 @@ def limitOrder() :
         print(data)
         params = data["options"]
         acct = data["account"]
+        params['type']  = int(params['type'] )
+        params['size'] = float( params['size'])
+        params["price"]= float(params["price"])
         restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
         side = ''
         if (params['type'] == 1):#买入   
@@ -141,6 +144,7 @@ def limitOrder() :
             side = 'sell'
         
         result = restAPI.create_order(params['instrument_id'], 'limit', side, volume = params['size'], price =params["price"])
+        print(result)
     except Exception as err:
         print(str(err))
         return res(False,{'error':str(err)}) 
@@ -230,7 +234,7 @@ def auto_trade():
             side1 = 'sell'
             side2 = 'buy'
         elif params['type']  == 3:
-            randomint = random.randomint(0, 1)
+            randomint = random.randrange(0, 2)
             if (randomint == 0):
                 side1 = 'buy'
                 side2 = 'sell'
@@ -249,7 +253,7 @@ def auto_trade():
         
         
     if not sched.get_job(acct['httpkey']) :
-        sched.add_job(auto_run, 'interval',max_instances=10, seconds=5,id="biki_auto")
+        sched.add_job(auto_run, 'interval',max_instances=10, seconds=order_interval,id="biki_auto")
         try:
             sched.start()
         except  Exception as err:
