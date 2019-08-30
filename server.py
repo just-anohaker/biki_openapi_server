@@ -22,12 +22,12 @@ executor = ThreadPoolExecutor(1)
 app = Flask(__name__)
 CORS(app)
 sockets = Sockets(app)
-app.register_blueprint(user,url_prefix='/user')
+app.register_blueprint(user,url_prefix='/api/user')
 # sockets.register_blueprint(ws, url_prefix=r'/')
 
-httpkey = 'b1a5712dfbe38e5d4b9a2d95bb14efb9'
-httpsecret = 'c75bb0e10aba426c542bb6f97e737e72'
-restAPI = restapi.RestAPI(httpkey, httpsecret)
+# httpkey = 'b1a5712dfbe38e5d4b9a2d95bb14efb9'
+# httpsecret = 'c75bb0e10aba426c542bb6f97e737e72'
+
 
 wscons = set()
 pending_order = []
@@ -42,7 +42,11 @@ log = print # logging.getLogger(__name__)
 @app.route('/')
 def hello_world():
     return 'Hello World!'
-
+def res(flag,data):
+    if flag:
+        return jsonify({ "success": True, "result": data})
+    else:
+        return jsonify({ "success": False, "error": data})
 
 @sockets.route('/ws')
 def depth_socket(ws):
@@ -60,13 +64,14 @@ def depth_socket(ws):
 #  * size  //挂单数量
 #  * sizeIncr //数量递增百分比
 #  * instrument_id
-@app.route('/batchOrder/gen', methods=['POST'])
+@app.route('/api/batch_order/gen', methods=['POST'])
 def generate_order():
     data = request.json
     print( data )
     params = data["options"]
    # print( data )
     orderCount =int( (params["topPrice"] - params["startPrice"]) / (params["startPrice"] * params["incr"]))
+    print( orderCount )
     batchOrder = []
     cost = 0
     sizes = []#订单数量 从小到大
@@ -87,10 +92,10 @@ def generate_order():
         side = 'sell'
     
     for i in range(0,orderCount,1):
-        order ={'side': side, 'type': 'limit', 'volume':  sizes[i],'price': prices[i]}
+        order ={'client_oid':i,'side': side, 'type': 'limit', 'volume':  sizes[i],'price': prices[i]}
         batchOrder.append(order)
         cost += float(order["price"]) * order["volume"]
-    return jsonify({ "result": True, "orders": batchOrder,"cost":floor(cost,4)})
+    return res(True,{ "result": True, "orders": batchOrder,"cost":floor(cost,4)}) 
 
 def floor(x,y):
     x*=10**y
@@ -98,67 +103,74 @@ def floor(x,y):
     x/=10**y
     return x
 
-@app.route('/batchOrder/order', methods=['POST'])
+@app.route('/api/batch_order/toBatchOrder', methods=['POST'])
 def batch_order():
     data = request.json
     print( data )
     params = data["options"]
     batchOrder = params['orders']
-    print(str(batchOrder) )
+    acct = data["account"]
+    restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
     try:
         # for j in range(0,len(batchOrder),1) :
         #     tmp = batchOrder[j, j + 1]
-            res = restAPI.create_and_cancel_mass_orders(symbol=SYMBOL, create_orders=batchOrder)
+             restAPI.create_and_cancel_mass_orders(symbol=SYMBOL, create_orders=batchOrder)
             # ins = params.instrument_id.toLowerCase()
             # for i in range (0,len(res[ins]),1):
             #     if  res[ins][i].order_id != -1 :
             #         res[ins][i].instrument_id = params.instrument_id
     except Exception as err:
         print(str(err) )
-        return {
-            "result": False,
-            "error_message": str(err) 
-        }
+        return res(True,{'error': str(err)})
 
-    return {
-        "result": True,
-        "data":res
-    }
+    return res(True,{'result':True})  
 
 
-@app.route('/limitOrder', methods=['POST'])
+@app.route('/api/batch_order/limitOrder', methods=['POST'])
 def limitOrder() :
-    data = request.json
-    params = data["options"]
-    acct = data["acct"]
-    restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
-    side = ''
-    if (params['type'] == 1):#买入   
-        side = 'buy'
-    elif params['type']  == 2:#卖出  
-        side = 'sell'
-    
-    result = restAPI.create_order(params['instrument_id'], 'limit', side, volume = params['size'], price =params["price"])
-    return result
+    try:
+        data = request.json
+        print(data)
+        params = data["options"]
+        acct = data["account"]
+        restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
+        side = ''
+        if (params['type'] == 1):#买入   
+            side = 'buy'
+        elif params['type']  == 2:#卖出  
+            side = 'sell'
+        
+        result = restAPI.create_order(params['instrument_id'], 'limit', side, volume = params['size'], price =params["price"])
+    except Exception as err:
+        print(str(err))
+        return res(False,{'error':str(err)}) 
+
+    return res(True,{'result':True})  
 
 
-@app.route('/marketOrder', methods=['POST'])
+
+@app.route('/api/batch_order/marketOrder', methods=['POST'])
 def marketOrder():
     data = request.json
+    print(data)
     params = data["options"]
-    acct = data["acct"]
+    acct = data["account"]
+    params['type']  = int(params['type'])
+   
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
     side = ''
     if (params['type'] == 1):#买入    
         side = 'buy'
-        result = restAPI.create_order(params['instrument_id'], 'market', side, volume = params['price'])
+        a= float( params['notional'])
+        result = restAPI.create_order(params['instrument_id'], 'market', side, volume = a)
     elif params['type']  == 2:#卖出 
         side = 'sell'
-        result = restAPI.create_order(params['instrument_id'], 'market', side, volume = params['size'])
-    return result
+        a = float( params['size'])
+        result = restAPI.create_order(params['instrument_id'], 'market', side, volume = a)
+    return res(True,{'result':True})  
 
 
-@app.route('/initAutoMaker', methods=['POST'])
+@app.route('/api/auto_maker', methods=['POST'])
 def auto_trade():
     ''' 
     每次挂单数量
@@ -170,13 +182,14 @@ def auto_trade():
     
     data = request.json
     params = data["options"]
-    acct = data["acct"]
-    params['perStartSize']
-    params['perTopSize']
-    params['countPerM']
+    acct = data["account"]
+    params['perStartSize'] = float(params['perStartSize'])
+    params['perTopSize'] = float(params['perTopSize'])
+    params['countPerM'] = int(params['countPerM'])
+    params['type'] =  int(params['type'])
     params['instrument_id']
 
-    # restAPI = restapi.RestAPI(acct.httpkey, acct.httpsecret)
+    restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
     # side = ''
     # if (params.type == 1):#买入   
     #     side = 'buy'
@@ -200,7 +213,7 @@ def auto_trade():
 
 
     def auto_run():
-        ticker_data = restAPI.get_ticker(SYMBOL)
+        ticker_data = restAPI.get_ticker(params['instrument_id'])
         ticker_data = ticker_data['data']
         print('Tick! The time is: %s' % datetime.now(),ticker_data['buy'],ticker_data['sell'])
         randomPrice = round(random.uniform(ticker_data['buy'], ticker_data['sell']), 4)
@@ -227,7 +240,7 @@ def auto_trade():
         toOrder = {'side': side1, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
         toTaker = {'side': side2, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
         print(" 下单! ",[toOrder,toTaker])
-        res = restAPI.create_and_cancel_mass_orders(symbol=SYMBOL, create_orders=[toOrder,toTaker])
+        res = restAPI.create_and_cancel_mass_orders(symbol=params['instrument_id'], create_orders=[toOrder,toTaker])
         print('create_orders:',res)
         # if res['code'] == 0:
         #     mass_place TODO 记录订单完成情况
@@ -236,30 +249,46 @@ def auto_trade():
         
         
     if not sched.get_job(acct['httpkey']) :
-        sched.add_job(auto_run, 'interval',max_instances=10, seconds=5,id=acct['httpkey'])
+        sched.add_job(auto_run, 'interval',max_instances=10, seconds=5,id="biki_auto")
         try:
             sched.start()
         except  Exception as err:
             print(err)
     
-    return jsonify({ "result": True})
+    return res(True,{'result':True}) 
 
 
-@app.route('/stopAutoMaker', methods=['POST'])
+@app.route('/api/auto_maker/stop', methods=['POST'])
 def stop_auto_maker():
     data = request.json
-    params = data["options"]
-    acct = data["acct"]
-    if sched.get_job(acct['httpkey']):
-        sched.remove_job(acct['httpkey'])
-    return jsonify({ "result": True})
+    # acct = data["account"]
+    if sched.get_job('biki_auto'):
+        sched.remove_job('biki_auto')
+    return res(True,True)
 
-@app.route('/depinfo', methods=['GET'])
+
+@app.route('/api/auto_maker/isRunning', methods=['POST'])
+def auto_maker_isrun():
+    data = request.json
+    # acct = data["account"]
+    if sched.get_job('biki_auto'):
+        return res(True,True) 
+    else:
+        return res(True,False) 
+
+@app.route('/api/batch_order/startDepInfo', methods=['POST'])
 def depinfo():
     depth_time = time.time()
+    data = request.json
+    print( data )
+    params = data["options"]
+    acct = data["account"]
+    if sched.get_job(acct['httpkey']):
+        return res(True,{'result':True})  
+    restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
     executor.submit(start_wsinfo) 
     def get_new_order():
-        res= restAPI.get_new_order(SYMBOL)
+        res= restAPI.get_new_order(params['instrument_id'])
         # print(time.time() ,depth_time,SEND_DEPTH )
         nonlocal depth_time
         pending_order = res['data']['resultList']
@@ -310,19 +339,14 @@ def depinfo():
                     "bids": tem_b
                 }}))
             depth_time = time.time()
-    pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=10)
+    pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=10,id='biki_auto')
     try:
         pending_order_sched.start()
     except  Exception as err:
             print(err)
     
-    return jsonify({ "result": True,"depth":wsinfo.depth})
+    return res(True,{'result':True})  
 
-
-@app.route('/initAutoMarket', methods=['GET'])
-def depinfo2():
-   # executor.submit(task_func) 
-    return jsonify({ "result": True,"depth":wsinfo.depth})
 
 def start_wsinfo():
     wsinfo.ws.run_forever()
@@ -331,9 +355,7 @@ def start_wsinfo():
 @app.route('/stopDepthInfo', methods=['POST'])
 def stop_wsinfo():
     wsinfo.ws.close()
-    return jsonify({ "result": True})
-
-
+    return res(True,{'result':True})  
 
 
 if __name__ == '__main__':

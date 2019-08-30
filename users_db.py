@@ -8,8 +8,8 @@ def init_db():
     db.execute(''' create table if not exists users (id text primary key, 
                                     name text not null,
                                     groupName text not null, 
-                                    httpKey text not null,
-                                    httpSecret text not null,
+                                    httpkey text not null,
+                                    httpsecret text not null,
                                     state integer not null);
     ''')
     conn.commit()
@@ -26,25 +26,30 @@ def users_all():
 
 def users_remove(para):
     sql = '''update users set state=? where id=?;'''
-    db.execute(sql,(1,para['id']))
+    db.execute(sql,(1,para))
     conn.commit()
+    sql = 'select * from users where  id=:userId ;'
+    return  query_db(sql, (para,) )
 
 def users_add(para):
-    sql = '''insert into users (id, groupName, name, httpKey, httpSecret,  state) values(?,?,
+    print(para)
+    sql = '''insert into users (id, groupName, name, httpkey, httpsecret,  state) values(?,?,
      ?, ?, ?, ?);'''
     para['id'] = str(uuid.uuid4())
     para['state'] = 0
-    print(para)
-    db.execute(sql,(para['id'],para['groupName'],para['name'],para['httpKey'],para['httpSecret'],para['state']))
+    db.execute(sql,(para['id'],para['groupName'],para['name'],para['httpkey'],para['httpsecret'],para['state']))
     conn.commit()
-    return  para['id']
+    sql = 'select * from users where  id=:userId ;'
+    return  query_db(sql, (para['id'],), one=True)
 
 def users_update(para):
     sql = '''update users set
-            groupName=:groupName, name=:name, httpKey=:httpKey, httpSecret=:httpSecret
-            where id=:userId and state=:state;'''
+            groupName=:groupName, name=:name, httpKey=:httpkey, httpSecret=:httpsecret
+            where id=:userId ;'''
     db.execute(sql,para)
     conn.commit() 
+    sql = 'select * from users where  id=:userId ;'
+    return query_db(sql,para)
 
 def users_all_invalid():
     sql = 'select * from users where state = 1;'
