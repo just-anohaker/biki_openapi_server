@@ -1,9 +1,9 @@
-from  gevent.pywsgi import WSGIServer
+# from  gevent.pywsgi import WSGIServer
 from gevent import monkey
 monkey.patch_all(thread=False)#
-from flask_sockets import Sockets
-from geventwebsocket.handler import WebSocketHandler
-from geventwebsocket import WebSocketError
+# from flask_sockets import Sockets
+# from geventwebsocket.handler import WebSocketHandler
+# from geventwebsocket import WebSocketError
 from flask import Flask,request,jsonify, Blueprint
 from flask_cors import CORS
 import biki.rest_api as restapi
@@ -12,6 +12,7 @@ import json,asyncio,time,logging,copy,os,random,math,atexit
 from biki.consts import *
 from datetime import datetime
 from apscheduler.schedulers.gevent import GeventScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from concurrent.futures import ThreadPoolExecutor
 from users_service  import user
 import data_base as order_db
@@ -22,7 +23,7 @@ executor = ThreadPoolExecutor(1)
 # ws = Blueprint(r'ws', __name__)
 app = Flask(__name__)
 
-socketio = SocketIO(app,cors_allowed_origins= '*')
+socketio = SocketIO(app,cors_allowed_origins= '*',async_mode = 'gevent')
 # socketio.init_app(app)#
 CORS(app)
 app.register_blueprint(user,url_prefix='/api/user')
@@ -44,6 +45,7 @@ log = print # logging.getLogger(__name__)
 
 @app.route('/')
 def hello_world():
+    time.sleep(10)
     return 'Hello World!'
 
 def res_format(flag,data):
@@ -269,7 +271,8 @@ def auto_trade():
         
     try:
         if not sched.get_job("biki_auto") :
-            sched.add_job(auto_run, 'interval',max_instances=10, seconds=order_interval,id="biki_auto")
+            # sched.add_job(auto_run, trigger=IntervalTrigger(seconds=3),max_instances=10, seconds=order_interval,id="biki_auto")
+            sched.add_job(func=auto_run, args=('biki_auto',), trigger=IntervalTrigger(seconds=order_interval))
     except  Exception as err:
         print(err)
         return res_format(False,{'error':str(err)})  
@@ -311,7 +314,7 @@ def depinfo():
     def get_new_order():
        
         res= restAPI.get_new_order(params['instrument_id'])
-        # print("get_new_order",res )
+        print("get_new_order",res )
         nonlocal depth_time
         pending_order = res['data']['resultList']
         #print('Tick! The time is: %s pendingorder %s' % (datetime.now(),pending_order))
@@ -384,7 +387,8 @@ def depinfo():
             return res_format(True,{'result':"server has started"}) 
         else:
             executor.submit(start_wsinfo)  
-            pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
+            # pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
+            pending_order_sched.add_job(func=get_new_order, args=('biki_auto',), trigger=IntervalTrigger(seconds=1))
     except  Exception as err:
             print('Exception!!!',err)
             return res_format(False,{'error':str(err)})   
@@ -517,7 +521,7 @@ def cancel_batch_order():
 * acct:{}
 * */
 '''
-@app.route('/api/auto_market/', methods=['POST'])
+@app.route('/api/auto_market', methods=['POST'])
 def start_auto_market():
     return
 
