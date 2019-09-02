@@ -33,8 +33,8 @@ class WsInfo:
         print('### opened ###')
 
         # sub trade ticker
-        ws.send(WS_TRADE_TICKER_SUB)
-        time.sleep(1)
+        # ws.send(WS_TRADE_TICKER_SUB)
+        # time.sleep(1)
         ws.send(WS_MARKET_DEPTH_SUB)
         # sub kline
     # ws.send('{"event":"sub","params":{"channel":"market_btcusdt_kline_1min","cb_id":"custom string"}}')
@@ -53,7 +53,7 @@ class WsInfo:
             #print(result)
             json_data = json.loads(result)
             if json_data['channel'] == WS_DEPTH_CHANNEL:
-                self.depth = json_data['tick']
+                self.depth = json_data
             elif json_data['channel'] == WS_TICKER_CHANNEL:
                 #print(result)
                 self.ticker = json_data['tick']
