@@ -272,7 +272,7 @@ def auto_trade():
     try:
         if not sched.get_job("biki_auto") :
             # sched.add_job(auto_run, trigger=IntervalTrigger(seconds=3),max_instances=10, seconds=order_interval,id="biki_auto")
-            sched.add_job(func=auto_run, args=('biki_auto',), trigger=IntervalTrigger(seconds=order_interval))
+            sched.add_job(func=auto_run, id="biki_auto", trigger=IntervalTrigger(seconds=order_interval))
     except  Exception as err:
         print(err)
         return res_format(False,{'error':str(err)})  
@@ -314,7 +314,7 @@ def depinfo():
     def get_new_order():
        
         res= restAPI.get_new_order(params['instrument_id'])
-        print("get_new_order",res )
+        # print("get_new_order",res )
         nonlocal depth_time
         pending_order = res['data']['resultList']
         #print('Tick! The time is: %s pendingorder %s' % (datetime.now(),pending_order))
@@ -388,7 +388,7 @@ def depinfo():
         else:
             executor.submit(start_wsinfo)  
             # pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
-            pending_order_sched.add_job(func=get_new_order, args=('biki_auto',), trigger=IntervalTrigger(seconds=1))
+            pending_order_sched.add_job(func=get_new_order, id=params['httpkey'], trigger=IntervalTrigger(seconds=1))
     except  Exception as err:
             print('Exception!!!',err)
             return res_format(False,{'error':str(err)})   
