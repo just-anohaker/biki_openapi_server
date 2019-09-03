@@ -1,9 +1,5 @@
-# from  gevent.pywsgi import WSGIServer
 from gevent import monkey
-monkey.patch_all(thread=False)#
-# from flask_sockets import Sockets
-# from geventwebsocket.handler import WebSocketHandler
-# from geventwebsocket import WebSocketError
+monkey.patch_all(thread=False)
 from flask import Flask,request,jsonify, Blueprint
 from flask_cors import CORS
 import biki.rest_api as restapi
@@ -20,26 +16,24 @@ from flask_socketio import SocketIO, emit
 # from decimal import *
 # getcontext().prec = 6
 executor = ThreadPoolExecutor(1)
-# ws = Blueprint(r'ws', __name__)
+
 app = Flask(__name__)
 
 socketio = SocketIO(app,cors_allowed_origins= '*',async_mode = 'gevent')
 # socketio.init_app(app)#
 CORS(app)
 app.register_blueprint(user,url_prefix='/api/user')
-# sockets.register_blueprint(ws, url_prefix=r'/')
 
-# httpkey = 'b1a5712dfbe38e5d4b9a2d95bb14efb9'
-# httpsecret = 'c75bb0e10aba426c542bb6f97e737e72'
-
-
-# wscons = set()
 pending_order = []
 sched = GeventScheduler()
 pending_order_sched = GeventScheduler()
 order_price = {}
 SEND_DEPTH = 0.25
 depth_data = {}
+symbol_info = {'symbol': 'trxusdt', 'count_coin': 'USDT', 'amount_precision': 2, 'base_coin': 'TRX', 'price_precision': 6}
+#{"symbol":"xysusdt","count_coin":"USDT","amount_precision":3,"base_coin":"XYS","price_precision":6}
+#{'symbol': 'trxusdt', 'count_coin': 'USDT', 'amount_precision': 2, 'base_coin': 'TRX', 'price_precision': 6}
+#{'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
 #logging.basicConfig(filename="test.log", filemode="w", format="%(asctime)s %(name)s:%(levelname)s:%(message)s", datefmt="%d-%M-%Y %H:%M:%S", level=logging.DEBUG)
 log = print # logging.getLogger(__name__)
 
@@ -113,10 +107,11 @@ def batch_order():
     batchOrder = params['orders']
     acct = data["account"]
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
+    symbol = symbol_info['symbol']
     try:
         # for j in range(0,len(batchOrder),1) :
         #     tmp = batchOrder[j, j + 1]
-        restAPI.create_and_cancel_mass_orders(symbol=SYMBOL, create_orders=batchOrder)
+        restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=batchOrder)
             # ins = params.instrument_id.toLowerCase()
             # for i in range (0,len(res[ins]),1):
             #     if  res[ins][i].order_id != -1 :
@@ -193,28 +188,16 @@ def auto_trade():
     params['perTopSize'] = float(params['perTopSize'])
     params['countPerM'] = int(params['countPerM'])
     params['type'] =  int(params['type'])
-    params['instrument_id']
+    symbol = params['instrument_id']
 
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
-    # side = ''
-    # if (params.type == 1):#买入   
-    #     side = 'buy'
-    #     result = restAPI.create_order(params['instrument_id'], 'market', side, volume = params['volume'])
-    # elif params.type == 2:#卖出  
-    #     side = 'sell'
-    #     result = restAPI.create_order(params['instrument_id'], 'market', side, volume = params['volume'])
+
     if  params['countPerM'] > 50 :
             return jsonify({
                 'result': False,
                 'error_message': "too many per min!"
             })
-        
-    # if (this.isAutoMaker()) {
-    #     return {
-    #         result: false,
-    #         error_message: "is auto makering!"
-    #     }
-    #     }
+
     order_interval = int(60  / params['countPerM']) 
 
 
@@ -222,10 +205,10 @@ def auto_trade():
         ticker_data = restAPI.get_ticker(params['instrument_id'])
         ticker_data = ticker_data['data']
         print('Tick! The time is: %s' % datetime.now(),ticker_data['buy'],ticker_data['sell'])
-        randomPrice = round(random.uniform(ticker_data['buy'], ticker_data['sell']), 6)
-        print('randomPrice',randomPrice)
-        perSize = round(random.uniform(params['perStartSize'], params['perTopSize']), 2)
-        print('perSize',perSize)
+        randomPrice = round(random.uniform(ticker_data['buy'], ticker_data['sell']),symbol_info['price_precision'] )#symbol_info['price_precision']
+        print('对倒andomPrice',randomPrice)
+        perSize = round(random.uniform(params['perStartSize'], params['perTopSize']),symbol_info['amount_precision'] )#symbol_info['amount_precision'] 
+        print('对倒perSize',perSize)
 
         side1 = ''
         side2 = ''
@@ -245,20 +228,20 @@ def auto_trade():
                 side2 = 'buy'        
         toOrder = {'side': side1, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
         toTaker = {'side': side2, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
-        print(" 下单! ",[toOrder,toTaker])
-        res = restAPI.create_and_cancel_mass_orders(symbol=params['instrument_id'], create_orders=[toOrder,toTaker])
-        print(" 下单res! ",res)
+        # print(" 下单! ",[toOrder,toTaker])
+        res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=[toOrder,toTaker])
+        print(" 对倒下单res! ",res)
         if res['code'] == '0':
             orderids = res['data']['mass_place'][0]['order_id']
-            print('create  mass orders :',res,orderids)
-            res = restAPI.create_and_cancel_mass_orders(symbol=params['instrument_id'], cancel_orders=orderids)
-            print('cancel orders :',res)
+            # print('create  mass orders :',res,orderids)
+            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
+            # print('cancel orders :',res)
             if res['code'] == '0':
                 for  ido in res['data']['mass_cancel']:
                     if ido['code'] == '0':
-                        print('ido :',ido)
+                        # print('ido :',ido)
                         res = restAPI.get_order_info(ido['order_id'][0],params['instrument_id'])
-                        print('get_order_info orders :',res)
+                        # print('get_order_info orders :',res)
                         if res['code'] == '0':
                             order_db.orders_add(res['data']['order_info'],acct['httpkey'])
             # res = restAPI.get_order_info(params['instrument_id'],orderids)
@@ -272,7 +255,7 @@ def auto_trade():
     try:
         if not sched.get_job("biki_auto") :
             # sched.add_job(auto_run, trigger=IntervalTrigger(seconds=3),max_instances=10, seconds=order_interval,id="biki_auto")
-            sched.add_job(func=auto_run, id="biki_auto", trigger=IntervalTrigger(seconds=order_interval))
+            sched.add_job(func=auto_run, id="biki_auto", max_instances=15,trigger=IntervalTrigger(seconds=order_interval))
     except  Exception as err:
         print(err)
         return res_format(False,{'error':str(err)})  
@@ -364,22 +347,14 @@ def depinfo():
                         tempv[2] = order_price[element[0]]
                     tem_b[index]  =  tempv
 
-            # print('tem_a',tem_a)
-            #print('ws.send',tem_a)
-            #time.sleep(2)#0.005
-            # for ws in wscons:
-            #     ws.send( json.dumps({"depth" + ":" + SYMBOL:{
-            #         "asks": tem_a,
-            #         "bids": tem_b
-            #     }}))
-            
             depth_data = {
                      "asks": tem_a,
                       "bids": tem_b,
                       "ts":wsinfo.depth['ts']
                 }
             # global socketio
-            socketio.emit("depth" + ":" + SYMBOL,depth_data)
+            symbol = symbol_info['symbol']
+            socketio.emit("depth" + ":" + symbol,depth_data)
             depth_time = time.time()
     try:        
         if pending_order_sched.get_job(params['httpkey']):
@@ -388,7 +363,7 @@ def depinfo():
         else:
             executor.submit(start_wsinfo)  
             # pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
-            pending_order_sched.add_job(func=get_new_order, id=params['httpkey'], trigger=IntervalTrigger(seconds=1))
+            pending_order_sched.add_job(func=get_new_order, id=params['httpkey'],max_instances=10,trigger=IntervalTrigger(seconds=1))
     except  Exception as err:
             print('Exception!!!',err)
             return res_format(False,{'error':str(err)})   
@@ -409,14 +384,6 @@ def stop_wsinfo():
     wsinfo.ws.close()
     return res_format(True,{'result':True})  
 
-
-# @socketio.on('connect', namespace='/test')
-# def test_disconnect():
-#     print("depth" + ":" + SYMBOL)
-#     emit("depth" + ":" + SYMBOL,{
-#                     "data":999
-#                 },namespace = '/test' ,broadcast=True)
-#     print('Client disconnected')
 
 '''
  * params:
@@ -523,12 +490,33 @@ def cancel_batch_order():
 '''
 @app.route('/api/auto_market', methods=['POST'])
 def start_auto_market():
+    data = request.json
+    params = data["options"]
+    acct = data["account"]
+    params['distance'] = int(params['distance'])
+    params['count'] = int(params['count'])
+    params['startSize'] = float(params['startSize'])
+    params['countPerM'] = int(params['countPerM'])
+    params['type'] =  int(params['type'])
+    symbol =params['instrument_id']
+
+    restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
+
     return
 
 def auto_market(params,acct):
     #TODO
-    return
 
+    return
+def get_symbol(symbol):
+        restAPI = restapi.RestAPI('','')
+        result = restAPI.get_symbols()
+        res = result['data']
+        if res:
+            for element in res:
+                if element['symbol'] == symbol:
+                    return element
+        return None
 if __name__ == '__main__':
     # ctx = app.app_context()
     # ctx.push()
