@@ -32,7 +32,7 @@ REST_NEW_ORDER = '/open/api/v2/new_order'
 REST_ORDER_INFO = '/open/api/order_info'
 REST_SYMBOLS = '/open/api/common/symbols'
 
-SYMBOL = 'trxusdt'
+SYMBOL = 'etmusdt'
 
 WS_TICKER_CHANNEL = 'market_%s_trade_ticker'%(SYMBOL)
 WS_DEPTH_CHANNEL = 'market_%s_depth_step0'%(SYMBOL)

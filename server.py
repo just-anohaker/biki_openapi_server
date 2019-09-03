@@ -30,7 +30,7 @@ pending_order_sched = GeventScheduler()
 order_price = {}
 SEND_DEPTH = 0.25
 depth_data = {}
-symbol_info = {'symbol': 'trxusdt', 'count_coin': 'USDT', 'amount_precision': 2, 'base_coin': 'TRX', 'price_precision': 6}
+symbol_info = {'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
 #{"symbol":"xysusdt","count_coin":"USDT","amount_precision":3,"base_coin":"XYS","price_precision":6}
 #{'symbol': 'trxusdt', 'count_coin': 'USDT', 'amount_precision': 2, 'base_coin': 'TRX', 'price_precision': 6}
 #{'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
