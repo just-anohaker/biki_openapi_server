@@ -4,7 +4,7 @@ from flask import Flask,request,jsonify, Blueprint
 from flask_cors import CORS
 import biki.rest_api as restapi
 from ws_info import wsinfo
-import json,asyncio,time,logging,copy,os,random,math,atexit
+import json,asyncio,time,logging,copy,os,random,math,atexit,os,string
 from biki.consts import *
 from datetime import datetime
 from apscheduler.schedulers.gevent import GeventScheduler
@@ -24,7 +24,7 @@ socketio = SocketIO(app,cors_allowed_origins= '*',async_mode = 'gevent')
 CORS(app)
 app.register_blueprint(user,url_prefix='/api/user')
 
-pending_order = []
+toCancel = []
 sched = GeventScheduler()
 pending_order_sched = GeventScheduler()
 order_price = {}
@@ -34,8 +34,17 @@ symbol_info = {'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3,
 #{"symbol":"xysusdt","count_coin":"USDT","amount_precision":3,"base_coin":"XYS","price_precision":6}
 #{'symbol': 'trxusdt', 'count_coin': 'USDT', 'amount_precision': 2, 'base_coin': 'TRX', 'price_precision': 6}
 #{'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
-#logging.basicConfig(filename="test.log", filemode="w", format="%(asctime)s %(name)s:%(levelname)s:%(message)s", datefmt="%d-%M-%Y %H:%M:%S", level=logging.DEBUG)
-log = print # logging.getLogger(__name__)
+
+logfile_name = str(time.strftime("%Y%m%d_%H%M%S", time.localtime()))+'.log'
+log_fname  = os.path.join(os.path.expanduser("~"),'Documents','pylog',logfile_name) 
+logging.basicConfig(filename=log_fname , filemode="w", format="%(asctime)s %(name)s:%(levelname)s:%(message)s", datefmt="%d-%M-%Y %H:%M:%S", level=logging.INFO)
+
+
+def log( *objs):
+    logger = logging.getLogger('server')
+    logger.debug(*objs)
+
+print = log
 
 @app.route('/')
 def hello_world():
@@ -48,9 +57,9 @@ def res_format(flag,data):
     else:
         return jsonify({ "success": False, "error": data})
 
-@socketio.on('message')
-def depth_socket(ms):
-    print("event message "+str(ms))
+# @socketio.on('message')
+# def depth_socket(ms):
+#     print("event message "+str(ms))
 
 
 # * type   //1 买入  2 卖出
@@ -295,13 +304,14 @@ def depinfo():
     params = data["options"]
     restAPI = restapi.RestAPI(params['httpkey'], params['httpsecret'])
     def get_new_order():
-       
-        res= restAPI.get_new_order(params['instrument_id'])
-        # print("get_new_order",res )
-        nonlocal depth_time
-        pending_order = res['data']['resultList']
+        pending_order = []
+        for i in range(1,3):
+            res= restAPI.get_new_order(params['instrument_id'],pagesize= 1000,page = i)
+            if res['data']['resultList']:
+                pending_order += res['data']['resultList']
         #print('Tick! The time is: %s pendingorder %s' % (datetime.now(),pending_order))
           # ws.send(message)
+        nonlocal depth_time
         if wsinfo.depth and (time.time() - depth_time > SEND_DEPTH) :
             order_price.clear()
             if pending_order:
@@ -488,7 +498,7 @@ def cancel_batch_order():
 * acct:{}
 * */
 '''
-@app.route('/api/auto_market', methods=['POST'])
+@app.route('/api/auto_market/test', methods=['POST'])
 def start_auto_market():
     data = request.json
     params = data["options"]
@@ -496,13 +506,84 @@ def start_auto_market():
     params['distance'] = int(params['distance'])
     params['count'] = int(params['count'])
     params['startSize'] = float(params['startSize'])
+    params['topSize'] = float(params['topSize'])
     params['countPerM'] = int(params['countPerM'])
     params['type'] =  int(params['type'])
     symbol =params['instrument_id']
-
+    order_interval = 60 * 1000 / params['countPerM'] 
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
+    # def auto_market():
+    # t=wsinfo.depth['ts']
+    # print( abs(time.time() - t) )
+    # if wsinfo.depth and  abs(time.time() - t) > 60*1000 :
+    #     print("无法自动补单! ticker data time exceed ",abs(time.time() - t), "s")
+    #     return 
+    
+    if (wsinfo.depth['tick']['asks'] and wsinfo.depth['tick']['buys']) :
+        asks = wsinfo.depth['tick']['asks'][params['distance']: params['distance'] + 1]
+        bids =wsinfo.depth['tick']['buys'][params['distance']:params['distance'] + 1]
+        asks_orders = []
+        bids_orders = []
+        print("asks====", asks)
+        print(bids)
 
-    return
+        for  i  in range(1,10):
+            perSize =round(random.uniform(params['startSize'] , params['startSize'] ),symbol_info['price_precision'] ) #getRandomArbitrary(parseFloat(params.startSize), parseFloat(params.topSize)).toFixed(4)
+            sellprice =0.0
+            buyprice =0.0
+            
+            sellprice = floor(float(asks[0][0]) + i * 0.0001 ,4)
+            buyprice = floor(float(bids[0][0]) - i * 0.0001 ,4)
+
+            sellOrder = {'side': 'sell', 'type': 'limit', 'volume':  perSize,'price': sellprice}
+            buyOrder = {'side': 'buy', 'type': 'limit', 'volume':  perSize,'price': buyprice}
+            asks_orders.append(sellOrder)
+            bids_orders.append(buyOrder)
+        
+        asks_o = []
+        bids_o = []
+        # params.count = params.count<10?params.count:10
+        if params['count']>=10:
+            params['count'] = 10
+
+        for  j in range(params['count']):#(let j = 0; j < params.count; j++) {
+            randInt  = 1
+            if params['type']  == 1:
+                randInt = random.randint(0, 19)
+            elif params['type']  == 2:
+                randInt = random.randint(0, 9)
+            elif params['type']  == 3:
+                randInt = random.randint(10, 19)
+            
+            if  randInt < 10:
+                bids_o = bids_o+bids_orders[randInt: randInt + 1]
+            else :
+                randInt = randInt % 10
+                asks_o = asks_o + asks_orders[randInt: randInt + 1]
+            
+        
+        orderss = asks_o+bids_o
+        print("market orders :",orderss)
+        print("market orders price:",list(map(lambda x:x['price'],orderss)))
+        res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=orderss)
+        print(" 补单下单res! ",res)
+        if res['code'] == '0':
+            orderids = res['data']['mass_place'][0]['order_id']
+            # print('create  mass orders :',res,orderids)
+            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
+            print('cancel orders :',res)
+            if res['code'] == '0':
+                for  ido in res['data']['mass_cancel']:
+                    if ido['code'] != '0':
+                        print('wait to cancel orders :',ido['order_id'][0])
+    # try:
+    #     if not sched.get_job("biki_auto_market") :
+    #        sched.add_job(func=auto_market, id="biki_auto_market", max_instances=15,trigger=IntervalTrigger(seconds=order_interval))
+    # except  Exception as err:
+    #     print(err)
+    #     return res_format(False,{'error':str(err)})  
+    return res_format(True,{'result':True}) 
+
 
 def auto_market(params,acct):
     #TODO
