@@ -36,7 +36,11 @@ symbol_info = {'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3,
 #{'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
 
 logfile_name = str(time.strftime("%Y%m%d_%H%M%S", time.localtime()))+'.log'
-log_fname  = os.path.join(os.path.expanduser("~"),'Documents','pylog',logfile_name) 
+folder = os.path.join(os.path.expanduser("~"),'Documents','biki_pylog')
+ex = os.path.exists(folder)
+if not ex:                   #判断是否存在文件夹如果不存在则创建为文件夹
+	os.makedirs(folder)
+log_fname  = os.path.join(folder,logfile_name) 
 logging.basicConfig(filename=log_fname , filemode="w", format="%(asctime)s %(name)s:%(levelname)s:%(message)s", datefmt="%d-%M-%Y %H:%M:%S", level=logging.INFO)
 
 
