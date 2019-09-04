@@ -307,7 +307,7 @@ def depinfo():
     print( data )
     params = data["options"]
     restAPI = restapi.RestAPI(params['httpkey'], params['httpsecret'])
-    def get_new_order():
+    def get_order():
         pending_order = []
         for i in range(1,3):
             res= restAPI.get_new_order(params['instrument_id'],pagesize= 1000,page = i)
@@ -320,7 +320,7 @@ def depinfo():
             order_price.clear()
             if pending_order:
                 for order in pending_order:
-                    if order['price'] in order_price:
+                    if float(order['price']) in order_price:
                         order_price[float(order['price'])] = float(order_price.get(order['price'])) + float(order['remain_volume'])
                     else :
                         order_price[float(order['price'])] = float(order['remain_volume'])
@@ -377,7 +377,7 @@ def depinfo():
         else:
             executor.submit(start_wsinfo)  
             # pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
-            pending_order_sched.add_job(func=get_new_order, id=params['httpkey'],max_instances=10,trigger=IntervalTrigger(seconds=1))
+            pending_order_sched.add_job(func=get_order, id=params['httpkey'],max_instances=10,trigger=IntervalTrigger(seconds=1))
     except  Exception as err:
             print('Exception!!!',err)
             return res_format(False,{'error':str(err)})   
@@ -448,18 +448,14 @@ def cancel_batch_order():
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
         
     try :
-        res_data = restAPI.get_new_order(symbol)
+        orders = []
         order_ids = []
-        # res.forEach(function (ele) {
-        #     # console.log("价格和id" + ele.price + "---" + ele.order_id)
-        #     if (params.startPrice <= ele.price && params.topPrice >= ele.price) {
-        #         order_ids.push(ele.order_id)
-        #     } else if (params.startPrice == 0 && params.topPrice == 0) {
-        #         order_ids.push(ele.order_id)
-        #     }
-        # })
+        for i in range(1,3):
+           res_data = restAPI.get_new_order(symbol,pagesize = 1000,page = i) 
+           if res_data['data']['resultList']:
+              orders += res_data['data']['resultList']
+       
         result = 'no orders'
-        orders = res_data['data']['resultList']
         if params['startPrice'] == float(0) and params['topPrice'] == float(0) :
             try:
                 print('cancel all')
