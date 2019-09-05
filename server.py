@@ -311,19 +311,25 @@ def depinfo():
         pending_order = []
         for i in range(1,3):
             res= restAPI.get_new_order(params['instrument_id'],pagesize= 1000,page = i)
-            if res['data']['resultList']:
+            if res['data'] and res['data']['resultList']:
                 pending_order += res['data']['resultList']
-        #print('Tick! The time is: %s pendingorder %s' % (datetime.now(),pending_order))
+        # print('Tick! The time is: %s pendingorder %s' % (datetime.now(),pending_order))
           # ws.send(message)
         nonlocal depth_time
         if wsinfo.depth and (time.time() - depth_time > SEND_DEPTH) :
             order_price.clear()
             if pending_order:
                 for order in pending_order:
-                    if float(order['price']) in order_price:
-                        order_price[float(order['price'])] = float(order_price.get(order['price'])) + float(order['remain_volume'])
+                    # print(order['price'])
+                    price= float(order['price'])
+                    if  price in order_price:
+                        order_price[price] = float(order_price.get(price)) + float(order['remain_volume'])
                     else :
-                        order_price[float(order['price'])] = float(order['remain_volume'])
+                        order_price[price] = float(order['remain_volume'])
+                    # if order['price'] in order_price:
+                    #     order_price[float(order['price'])] = float(order_price.get(order['price'])) + float(order['remain_volume'])
+                    # else :
+                    #     order_price[float(order['price'])] = float(order['remain_volume'])
             else:
                 tem_a = copy.copy(wsinfo.depth['tick']['asks']) 
                 tem_b = copy.copy( wsinfo.depth['tick']['buys'] )
@@ -348,6 +354,7 @@ def depinfo():
                     tem_a[index]  =  tempv
                     #tem_a[index][2] = order_price[str(element[0])]
             tem_b = copy.copy( wsinfo.depth['tick']['buys'] )
+            # print("order price:",order_price)
             for  index in range (len(tem_b)):
                 element = tem_b[index]
                 if element[0] in order_price:
@@ -360,7 +367,7 @@ def depinfo():
                     else:
                         tempv[2] = order_price[element[0]]
                     tem_b[index]  =  tempv
-
+            # print('tem_b:',tem_b)
             depth_data = {
                      "asks": tem_a,
                       "bids": tem_b,
@@ -452,7 +459,7 @@ def cancel_batch_order():
         order_ids = []
         for i in range(1,3):
            res_data = restAPI.get_new_order(symbol,pagesize = 1000,page = i) 
-           if res_data['data']['resultList']:
+           if res_data['data'] and res_data['data']['resultList']:
               orders += res_data['data']['resultList']
        
         result = 'no orders'
