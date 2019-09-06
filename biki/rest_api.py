@@ -119,7 +119,10 @@ class RestAPI(Client):
             request_params = []
             for param in create_orders:
                 param['side'] = param['side'].upper()
-                param['type'] = '1' if (param['type'] == 'limit') else '2'
+                if (param['type'] == 'limit'):
+                    param['type'] = '1' 
+                elif (param['type'] == 'market'):
+                    param['type'] = '2'
                 request_params.append(param)
             params['mass_place'] = json.dumps(request_params)
         params['symbol'] = symbol
