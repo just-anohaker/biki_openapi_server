@@ -24,7 +24,6 @@ socketio = SocketIO(app,cors_allowed_origins= '*',async_mode = 'gevent')
 CORS(app)
 app.register_blueprint(user,url_prefix='/api/user')
 
-toCancel = []
 sched = GeventScheduler()
 pending_order_sched = GeventScheduler()
 order_price = {}
@@ -42,10 +41,10 @@ if not ex:                   #判断是否存在文件夹如果不存在则创�
 	os.makedirs(folder)
 log_fname  = os.path.join(folder,logfile_name) 
 logging.basicConfig(filename=log_fname , filemode="w", format="%(asctime)s %(name)s:%(levelname)s:%(message)s", datefmt="%d-%M-%Y %H:%M:%S", level=logging.INFO)
-
-
+logger = logging.getLogger('server')
+chlr = logging.StreamHandler()
+logger.addHandler(chlr)
 def log( *objs):
-    logger = logging.getLogger('server')
     logger.debug(*objs)
 
 print = log
@@ -211,52 +210,63 @@ def auto_trade():
                 'error_message': "too many per min!"
             })
 
-    order_interval = int(60  / params['countPerM']) 
+    order_interval = 60  / params['countPerM']
 
 
     def auto_run():
-        ticker_data = restAPI.get_ticker(params['instrument_id'])
-        ticker_data = ticker_data['data']
-        print('Tick! The time is: %s' % datetime.now(),ticker_data['buy'],ticker_data['sell'])
-        randomPrice = round(random.uniform(ticker_data['buy'], ticker_data['sell']),symbol_info['price_precision'] )#symbol_info['price_precision']
-        print('对倒andomPrice',randomPrice)
-        perSize = round(random.uniform(params['perStartSize'], params['perTopSize']),symbol_info['amount_precision'] )#symbol_info['amount_precision'] 
-        print('对倒perSize',perSize)
-
-        side1 = ''
-        side2 = ''
-        if (params['type'] == 1) :
-            side1 = 'buy'
-            side2 = 'sell'
-        elif (params['type']  == 2) :
-            side1 = 'sell'
-            side2 = 'buy'
-        elif params['type']  == 3:
-            randomint = random.randrange(0, 2)
-            if (randomint == 0):
+        print('auto_run in.....')
+        to_wait = []
+        for i in range( params['countPerM']):#一分钟内随机时间
+            ranint = random.uniform(1,order_interval)
+            j = i - 1
+            if j >= 0:
+                to_wait.append([order_interval-to_wait[j][1],ranint])
+            else:
+                to_wait.append([0,ranint])
+        for w in range(len(to_wait)):
+            time.sleep(to_wait[w][0]+to_wait[w][1])
+            # print('auto_run .....',w,datetime.now())
+            ticker_data = restAPI.get_ticker(params['instrument_id'])
+            ticker_data = ticker_data['data']
+            randomPrice = round(random.uniform(ticker_data['buy'], ticker_data['sell']),symbol_info['price_precision'] )#symbol_info['price_precision']
+            # print('对倒andomPrice',randomPrice)
+            perSize = round(random.uniform(params['perStartSize'], params['perTopSize']),symbol_info['amount_precision'] )#symbol_info['amount_precision'] 
+            # print('对倒perSize',perSize)
+            print('Time & tick : %s' % datetime.now(),ticker_data['buy'],ticker_data['sell'],perSize,randomPrice)
+            side1 = ''
+            side2 = ''
+            if (params['type'] == 1) :
                 side1 = 'buy'
                 side2 = 'sell'
-            else:
+            elif (params['type']  == 2) :
                 side1 = 'sell'
-                side2 = 'buy'        
-        toOrder = {'side': side1, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
-        toTaker = {'side': side2, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
-        # print(" 下单! ",[toOrder,toTaker])
-        res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=[toOrder,toTaker])
-        print(" 对倒下单res! ",res)
-        if res['code'] == '0':
-            orderids = res['data']['mass_place'][0]['order_id']
-            # print('create  mass orders :',res,orderids)
-            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
-            # print('cancel orders :',res)
+                side2 = 'buy'
+            elif params['type']  == 3:
+                randomint = random.randrange(0, 2)
+                if (randomint == 0):
+                    side1 = 'buy'
+                    side2 = 'sell'
+                else:
+                    side1 = 'sell'
+                    side2 = 'buy'        
+            toOrder = {'side': side1, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
+            toTaker = {'side': side2, 'type': 'limit', 'volume':  perSize,'price': randomPrice}
+            print("下单! ",[toOrder,toTaker])
+            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=[toOrder,toTaker])
+            print("对倒下单res! ",res)
             if res['code'] == '0':
-                for  ido in res['data']['mass_cancel']:
-                    if ido['code'] == '0':
-                        # print('ido :',ido)
-                        res = restAPI.get_order_info(ido['order_id'][0],params['instrument_id'])
-                        # print('get_order_info orders :',res)
-                        if res['code'] == '0':
-                            order_db.orders_add(res['data']['order_info'],acct['httpkey'])
+                orderids = res['data']['mass_place'][0]['order_id']
+                # print('create  mass orders :',res,orderids)
+                res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
+                # print('cancel orders :',res)
+                if res['code'] == '0':
+                    for  ido in res['data']['mass_cancel']:
+                        if ido['code'] == '0':
+                            print('auto maker  cancel orders :',ido)
+                            res = restAPI.get_order_info(ido['order_id'][0],params['instrument_id'])
+                            print('auto maker get cancel orders :',res)
+                            if res['code'] == '0':
+                                order_db.orders_add(res['data']['order_info'],acct['httpkey'])
             # res = restAPI.get_order_info(params['instrument_id'],orderids)
 
         #print('get_order_info:',res)
@@ -268,7 +278,7 @@ def auto_trade():
     try:
         if not sched.get_job("biki_auto") :
             # sched.add_job(auto_run, trigger=IntervalTrigger(seconds=3),max_instances=10, seconds=order_interval,id="biki_auto")
-            sched.add_job(func=auto_run, id="biki_auto", max_instances=15,trigger=IntervalTrigger(seconds=order_interval))
+            sched.add_job(func=auto_run, id="biki_auto", max_instances=5,next_run_time= datetime.now(), trigger=IntervalTrigger(seconds=60))
     except  Exception as err:
         print(err)
         return res_format(False,{'error':str(err)})  
@@ -382,9 +392,8 @@ def depinfo():
             print("server has started !")
             return res_format(True,{'result':"server has started"}) 
         else:
-            executor.submit(start_wsinfo)  
             # pending_order_sched.add_job(get_new_order, 'interval',max_instances=10, seconds=1,id=params['httpkey']) 
-            pending_order_sched.add_job(func=get_order, id=params['httpkey'],max_instances=10,trigger=IntervalTrigger(seconds=1))
+            pending_order_sched.add_job(func=get_order, id=params['httpkey'],max_instances=5,next_run_time= datetime.now(),trigger=IntervalTrigger(seconds=1))
     except  Exception as err:
             print('Exception!!!',err)
             return res_format(False,{'error':str(err)})   
@@ -392,13 +401,6 @@ def depinfo():
     return res_format(True,{'result':True})  
 
 
-def start_wsinfo():
-    wsinfo.ws.run_forever()
-    return 
-@atexit.register
-def exit_app():
-    print('exit server!')
-    wsinfo.ws.close()
 
 @app.route('/stopDepthInfo', methods=['POST'])
 def stop_wsinfo():
@@ -505,7 +507,7 @@ def cancel_batch_order():
 * acct:{}
 * */
 '''
-@app.route('/api/auto_market/test', methods=['POST'])
+@app.route('/api/auto_market', methods=['POST'])
 def start_auto_market():
     data = request.json
     params = data["options"]
@@ -517,85 +519,131 @@ def start_auto_market():
     params['countPerM'] = int(params['countPerM'])
     params['type'] =  int(params['type'])
     symbol =params['instrument_id']
-    order_interval = 60 * 1000 / params['countPerM'] 
+    order_interval = 60  / params['countPerM'] 
     restAPI = restapi.RestAPI(acct['httpkey'], acct['httpsecret'])
+    to_cancel = []
     # def auto_market():
     # t=wsinfo.depth['ts']
     # print( abs(time.time() - t) )
     # if wsinfo.depth and  abs(time.time() - t) > 60*1000 :
     #     print("无法自动补单! ticker data time exceed ",abs(time.time() - t), "s")
     #     return 
-    
-    if (wsinfo.depth['tick']['asks'] and wsinfo.depth['tick']['buys']) :
-        asks = wsinfo.depth['tick']['asks'][params['distance']: params['distance'] + 1]
-        bids =wsinfo.depth['tick']['buys'][params['distance']:params['distance'] + 1]
-        asks_orders = []
-        bids_orders = []
-        print("asks====", asks)
-        print(bids)
+    def auto_market():
+        # print("auto_market==== in")
+        if not wsinfo.depth:
+            print("无法自动补单!")
+            return
+        t = wsinfo.depth['ts'] 
+        nonlocal to_cancel
+        # print( abs(time.time() - t/1000) )
+        if t and  abs(time.time() - t/1000) > 300 :
+            print("无法自动补单! ticker data time exceed ",abs(time.time() - t), "s")
+            return 
+        if wsinfo.depth['tick'] and (wsinfo.depth['tick']['asks'] and wsinfo.depth['tick']['buys']) :
+            asks = wsinfo.depth['tick']['asks'][params['distance']: params['distance'] + 1]
+            bids =wsinfo.depth['tick']['buys'][params['distance']:params['distance'] + 1]
+            asks_orders = []
+            bids_orders = []
+            # print("asks====", asks)
+            # print("bids====", bids)
 
-        for  i  in range(1,10):
-            perSize =round(random.uniform(params['startSize'] , params['startSize'] ),symbol_info['price_precision'] ) #getRandomArbitrary(parseFloat(params.startSize), parseFloat(params.topSize)).toFixed(4)
-            sellprice =0.0
-            buyprice =0.0
-            
-            sellprice = floor(float(asks[0][0]) + i * 0.0001 ,4)
-            buyprice = floor(float(bids[0][0]) - i * 0.0001 ,4)
+            for  i  in range(1,11):
+                perSize =round(random.uniform(params['startSize'] , params['startSize'] ),symbol_info['price_precision'] ) #getRandomArbitrary(parseFloat(params.startSize), parseFloat(params.topSize)).toFixed(4)
+                sellprice =0.0
+                buyprice =0.0
+                
+                sellprice = floor(float(asks[0][0]) + i * 0.00001 ,6)
+                buyprice = floor(float(bids[0][0]) - i * 0.00001 ,6)
 
-            sellOrder = {'side': 'sell', 'type': 'limit', 'volume':  perSize,'price': sellprice}
-            buyOrder = {'side': 'buy', 'type': 'limit', 'volume':  perSize,'price': buyprice}
-            asks_orders.append(sellOrder)
-            bids_orders.append(buyOrder)
-        
-        asks_o = []
-        bids_o = []
-        # params.count = params.count<10?params.count:10
-        if params['count']>=10:
-            params['count'] = 10
-
-        for  j in range(params['count']):#(let j = 0; j < params.count; j++) {
-            randInt  = 1
-            if params['type']  == 1:
-                randInt = random.randint(0, 19)
-            elif params['type']  == 2:
-                randInt = random.randint(0, 9)
-            elif params['type']  == 3:
-                randInt = random.randint(10, 19)
+                sellOrder = {'side': 'sell', 'type': 'limit', 'volume':  perSize,'price': sellprice}
+                buyOrder = {'side': 'buy', 'type': 'limit', 'volume':  perSize,'price': buyprice}
+                asks_orders.append(sellOrder)
+                bids_orders.append(buyOrder)
             
-            if  randInt < 10:
-                bids_o = bids_o+bids_orders[randInt: randInt + 1]
-            else :
-                randInt = randInt % 10
-                asks_o = asks_o + asks_orders[randInt: randInt + 1]
-            
-        
-        orderss = asks_o+bids_o
-        print("market orders :",orderss)
-        print("market orders price:",list(map(lambda x:x['price'],orderss)))
-        res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=orderss)
-        print(" 补单下单res! ",res)
-        if res['code'] == '0':
-            orderids = res['data']['mass_place'][0]['order_id']
-            # print('create  mass orders :',res,orderids)
-            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
-            print('cancel orders :',res)
+            asks_o = []
+            bids_o = []
+            # params.count = params.count<10?params.count:10
+            ran_count = params['count']
+            if ran_count>=10:
+                ran_count = 10
+            print("补单下单! ran_count",ran_count)
+            for  j in range(ran_count):#(let j = 0; j < params.count; j++) {
+                randInt  = 1
+             
+                if params['type']  == 1:
+                    randInt = random.randint(0, 19)
+                elif params['type']  == 2:
+                    randInt = random.randint(0, 9)
+                elif params['type']  == 3:
+                    randInt = random.randint(10, 19)
+                
+                if  randInt < 10:
+                    bids_o.append(bids_orders[randInt])
+                else :
+                    randInt = randInt % 10
+                    asks_o.append(asks_orders[randInt])
+            orderss = asks_o+bids_o
+            print("orders price:",list(map(lambda x:x['price'],orderss)))
+            res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=orderss)
             if res['code'] == '0':
-                for  ido in res['data']['mass_cancel']:
-                    if ido['code'] != '0':
-                        print('wait to cancel orders :',ido['order_id'][0])
-    # try:
-    #     if not sched.get_job("biki_auto_market") :
-    #        sched.add_job(func=auto_market, id="biki_auto_market", max_instances=15,trigger=IntervalTrigger(seconds=order_interval))
-    # except  Exception as err:
-    #     print(err)
-    #     return res_format(False,{'error':str(err)})  
+                orderids = res['data']['mass_place'][0]['order_id']
+                if res['data']['mass_place'][0]['code'] == '0':#下单成功
+                    to_cancel += orderids
+                    # print('add to cancel',to_cancel)
+                    res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=orderids)
+                    print('cancel orders :',res)
+                    if res['code'] == '0' and res['data']['mass_cancel'][0]['code'] == '0':
+                        for to_rm in  res['data']['mass_cancel'][0]['order_id']:
+                            to_cancel.remove(to_rm)
+
+                    print('to cancel',to_cancel)
+    def cancel_orders():
+        # print('cancel orders :',to_cancel)
+        if len(to_cancel) > 0:
+            c_res = restAPI.create_and_cancel_mass_orders(symbol=symbol, cancel_orders=to_cancel)
+            if c_res['code'] == '0' and c_res['data']['mass_cancel'][0]['code'] == '0':
+                for to_rm in  c_res['data']['mass_cancel'][0]['order_id']:
+                    to_cancel.remove(to_rm)
+        # print('cancel orders :',to_cancel)
+    try:
+        if not sched.get_job("biki_auto_market") :
+           sched.add_job(func=auto_market, id="biki_auto_market", max_instances=5,next_run_time= datetime.now(),trigger=IntervalTrigger(seconds=order_interval))
+        if not sched.get_job("biki_auto_cancel_orders") :
+           sched.add_job(func=cancel_orders, id="biki_auto_cancel_orders", max_instances=5,next_run_time= datetime.now(),trigger=IntervalTrigger(seconds=6))
+    except  Exception as err:
+        print(err)
+        return res_format(False,{'error':str(err)})  
     return res_format(True,{'result':True}) 
 
+@app.route('/api/auto_market/stop', methods=['POST'])
+def stop_auto_market():
+    data = request.json
+    # acct = data["account"]
+    if sched.get_job('biki_auto_market'):
+        sched.remove_job('biki_auto_market')
+    if sched.get_job('biki_auto_cancel_orders'):
+        sched.remove_job('biki_auto_cancel_orders')
+    return res_format(True,True)
 
-def auto_market(params,acct):
-    #TODO
 
-    return
+
+@app.route('/api/auto_market/isRunning', methods=['POST'])
+def auto_market_isrun():
+    data = request.json
+    # acct = data["account"]
+    if sched.get_job('biki_auto_market'):
+        return res_format(True,True) 
+    else:
+        return res_format(True,False) 
+
+def start_wsinfo():
+    wsinfo.ws.run_forever()
+    return 
+@atexit.register
+def exit_app():
+    print('exit server!')
+    wsinfo.ws.close()
+
 def get_symbol(symbol):
         restAPI = restapi.RestAPI('','')
         result = restAPI.get_symbols()
@@ -608,6 +656,7 @@ def get_symbol(symbol):
 if __name__ == '__main__':
     # ctx = app.app_context()
     # ctx.push()
+    executor.submit(start_wsinfo)  
     sched.start()   
     pending_order_sched.start()
     socketio.run(app,host='0.0.0.0',port= 5000)
