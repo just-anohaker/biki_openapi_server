@@ -35,7 +35,7 @@ symbol_info = {'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3,
 #{'symbol': 'etmusdt', 'count_coin': 'USDT', 'amount_precision': 3, 'base_coin': 'ETM', 'price_precision': 6}
 
 logfile_name = str(time.strftime("%Y%m%d_%H%M%S", time.localtime()))+'.log'
-folder = os.path.join(os.path.expanduser("~"),'Documents','biki_pylog')
+folder = os.path.join(os.path.expanduser("~"),'Documents','biki_userdatas','biki_pylog')
 ex = os.path.exists(folder)
 if not ex:                   #判断是否存在文件夹如果不存在则创建为文件夹
 	os.makedirs(folder)
@@ -214,6 +214,21 @@ def auto_trade():
 
 
     def auto_run():
+        '''
+        现在对倒逻辑：
+            以每分钟对倒6次为例
+            第一次：会在前10秒里面的任意一秒对倒一次。
+            第二次：会在10-20秒里面任意一秒对倒一次。
+            依次类推
+
+            如果每分钟对倒10次：
+            第一次：会在前6秒里面的任意一秒对倒一次。
+            第二次：会在6-12秒里面任意一秒对倒一次。
+            依次类推
+
+            ps：1.以上逻辑会出现些误差，但误差不会太多
+            2.频率设置太快（例如：每分钟对倒60次，那么每秒都会对倒）会失去随机的意义
+        '''
         print('auto_run in.....')
         to_wait = []
         for i in range( params['countPerM']):#一分钟内随机时间
@@ -548,7 +563,7 @@ def start_auto_market():
             # print("bids====", bids)
 
             for  i  in range(1,11):
-                perSize =round(random.uniform(params['startSize'] , params['startSize'] ),symbol_info['price_precision'] ) #getRandomArbitrary(parseFloat(params.startSize), parseFloat(params.topSize)).toFixed(4)
+                perSize =round(random.uniform(params['startSize'] , params['topSize'] ),symbol_info['price_precision'] )
                 sellprice =0.0
                 buyprice =0.0
                 

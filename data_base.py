@@ -1,6 +1,13 @@
-import sqlite3,uuid
+import sqlite3,uuid,os
 
-conn = sqlite3.connect('biki.db', check_same_thread=False)
+db_name = 'biki.db'
+folder_db = os.path.join(os.path.expanduser("~"),'Documents','biki_userdatas')
+ex_db = os.path.exists(folder_db)
+if not ex_db:                   #判断是否存在文件夹如果不存在则创建为文件夹
+	os.makedirs(folder_db)
+fname  = os.path.join(folder_db,db_name) 
+
+conn = sqlite3.connect(fname, check_same_thread=False)
 
 db = conn.cursor()
 
