@@ -563,7 +563,7 @@ def start_auto_market():
             # print("bids====", bids)
 
             for  i  in range(1,11):
-                perSize =round(random.uniform(params['startSize'] , params['topSize'] ),symbol_info['price_precision'] )
+                perSize =round(random.uniform(params['startSize'] , params['topSize'] ),symbol_info['amount_precision'] )
                 sellprice =0.0
                 buyprice =0.0
                 
@@ -581,7 +581,7 @@ def start_auto_market():
             ran_count = params['count']
             if ran_count>=10:
                 ran_count = 10
-            print("补单下单! ran_count",ran_count)
+            # print("补单下单! ran_count",ran_count)
             for  j in range(ran_count):#(let j = 0; j < params.count; j++) {
                 randInt  = 1
              
@@ -598,8 +598,10 @@ def start_auto_market():
                     randInt = randInt % 10
                     asks_o.append(asks_orders[randInt])
             orderss = asks_o+bids_o
+            print("补单下单! orderss",orderss)
             print("orders price:",list(map(lambda x:x['price'],orderss)))
             res = restAPI.create_and_cancel_mass_orders(symbol=symbol, create_orders=orderss)
+            print("补单下单! res",res)
             if res['code'] == '0':
                 orderids = res['data']['mass_place'][0]['order_id']
                 if res['data']['mass_place'][0]['code'] == '0':#下单成功
