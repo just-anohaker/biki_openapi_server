@@ -44,8 +44,11 @@ logging.basicConfig(filename=log_fname , filemode="w", format="%(asctime)s %(nam
 logger = logging.getLogger('server')
 chlr = logging.StreamHandler()
 logger.addHandler(chlr)
-def log( *objs):
-    logger.debug(*objs)
+def log( *args):
+    s = ''
+    for i in args:
+        s += (str(i) + ' ')
+    logger.info(s)
 
 print = log
 
@@ -247,7 +250,7 @@ def auto_trade():
             # print('对倒andomPrice',randomPrice)
             perSize = round(random.uniform(params['perStartSize'], params['perTopSize']),symbol_info['amount_precision'] )#symbol_info['amount_precision'] 
             # print('对倒perSize',perSize)
-            print('Time & tick : %s' % datetime.now(),ticker_data['buy'],ticker_data['sell'],perSize,randomPrice)
+            print('Time & tick :' ,ticker_data['buy'],ticker_data['sell'],perSize,randomPrice)
             side1 = ''
             side2 = ''
             if (params['type'] == 1) :
